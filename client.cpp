@@ -1,55 +1,94 @@
+#include <stdio.h>
 #include <ctime>
-#include <string>
-#include <vector>
 #include <iostream>
-#include <fstream>
-#include <unistd.h>
-#include <sys/time.h>
-
-#include <boost/thread/thread.hpp>
+#include <string>
+#include <algorithm>
+#include <boost/thread.hpp>
 #include <boost/asio.hpp>
 #include <boost/lexical_cast.hpp>
+#include <unistd.h>
+#include <sys/time.h>
 #include "fps.h"
+#include "color.h"
 
-using namespace boost::posix_time;
-using namespace boost::this_thread;
+using boost::this_thread::sleep;
+using boost::posix_time::milliseconds;
 using boost::asio::ip::udp;
 using std::string;
 using std::cerr;
 using std::endl;
 
 void printUsage() {
-  cerr << "Usage: client [-f <frameSize>] <host> <port>" << endl;
+  cerr << "Usage: server [-b <brightness>][-s <sampleScale>][-r][-f <frameSize>] <port>" << endl;
 }
 
-class HeartbeatSender {
+class HeartbeatReceiver {
   udp::socket* socket;
-  udp::endpoint receiverEndpoint;
   boost::array<char, 1> buf;
+  boost::posix_time::ptime last;
+  bool alive_;
+  bool checked_;
 public:
-  HeartbeatSender(udp::socket* socket, const udp::endpoint& receiverEndpoint) :
+  HeartbeatReceiver(udp::socket* socket) :
     socket(socket),
-    receiverEndpoint(receiverEndpoint) {
-        buf[0] = 0;
-    }
+    alive_(false),
+    checked_(false)
+  {}
+
   void run() {
-    for(;;) {
-      socket->send_to(boost::asio::buffer(buf), receiverEndpoint);
-      boost::this_thread::sleep(milliseconds(300));
+    using namespace boost::posix_time;
+    boost::system::error_code error;
+    ptime now;
+    udp::endpoint endpoint;
+    while(!this->checked_ || this->alive_) {
+      socket->receive_from(boost::asio::buffer(buf), endpoint, 0, error);
+
+      if(error == boost::system::errc::success) {
+        last = microsec_clock::local_time();
+      }
     }
+  }
+
+  bool alive() {
+    ptime now = microsec_clock::local_time();
+    if((now - last).total_milliseconds() < 1000) {
+      this->alive_ = true;
+      this->checked_ = true;
+    } else {
+      this->alive_ = false;
+    }
+
+    return this->alive_;
   }
 };
 
+
 int main(int argc, char** argv)
 {
-  try
-  {
+  try {
     int8_t c;
     size_t frameSize = 480;
-    while ((c = getopt(argc, argv, "f:")) != -1) {
+    size_t frameRate = 200;
+    int16_t hue = 0;
+    int16_t saturation = 0;
+    int16_t lightness = 0;
+
+    while ((c = getopt(argc, argv, "h:s:l:f:r:")) != -1) {
       switch (c) {
       case 'f':
         frameSize = boost::lexical_cast<size_t>(optarg);
+        break;
+      case 'r':
+        frameRate = boost::lexical_cast<size_t>(optarg);
+        break;
+      case 'h':
+        hue = boost::lexical_cast<int16_t>(optarg);
+        break;
+      case 's':
+        saturation = boost::lexical_cast<int16_t>(optarg);
+        break;
+      case 'l':
+        lightness = boost::lexical_cast<int16_t>(optarg);
         break;
       case ':':
         printUsage();
@@ -59,57 +98,98 @@ int main(int argc, char** argv)
         break;
       }
     }
-    if(argc - optind < 2)
+
+    if(argc - optind < 1)
       printUsage();
 
     string host = argv[optind];
     string port = argv[optind + 1];
 
-    cerr << "initialize: " << host << ":" << port << " ..." << endl;
+    cerr << "connecting: " << host << ":" << port << " ..." << endl;
+
+    // set cin unbuffered
+    std::cin.setf(std::ios_base::unitbuf);
+
+    //prepare the udp socket
+    boost::asio::io_service io_service;
+    udp::socket socket(io_service);
+    socket.open(udp::v4());
+
+    udp::resolver resolver(io_service);
+    udp::resolver::query query(udp::v4(),host, port);
+    udp::endpoint endpoint = *resolver.resolve(query);
+
+    //set send buffer size to 2 frames
+    udp::socket::native_type native_sock = socket.native();
+    int buffsize = frameSize * 2;
+    setsockopt(native_sock, SOL_SOCKET, SO_SNDBUF, &buffsize, sizeof(buffsize));
+
     for(;;) {
-      boost::asio::io_service io_service;
-      udp::socket socket(io_service);
-      socket.open(udp::v4());
+      boost::system::error_code error;
 
-      udp::resolver resolver(io_service);
-      udp::resolver::query query(udp::v4(),host, port);
-      udp::endpoint receiverEndpoint = *resolver.resolve(query);
+      HeartbeatReceiver hearbeat(&socket);
+      boost::thread(&HeartbeatReceiver::run, &hearbeat);
 
-      udp::socket::native_type native_sock = socket.native();
-      int sendBufferSize = frameSize * 2;
-      setsockopt(native_sock, SOL_SOCKET, SO_RCVBUF, &sendBufferSize, sizeof(sendBufferSize));
+      if (error && error != boost::asio::error::message_size)
+        throw boost::system::system_error(error);
 
-      HeartbeatSender heartbeat(&socket, receiverEndpoint);
-      boost::thread(&HeartbeatSender::run, heartbeat);
-      std::vector<char> recv_buf;
-      recv_buf.reserve(frameSize);
+      char readBuf[frameSize];
 
-      udp::endpoint sender_endpoint;
-
-      // don't disable buffering on the spidev
-      std::ofstream out("/dev/spidev0.0");
       Fps fps;
+      size_t fpsPrintLimit = 100;
+      float targetDur = (1000.0 / frameRate);
       float rate = 1;
-      size_t fpsPrintLimit  = 100;
-
-      cerr << "receive..." << endl;
       fps.start();
-      while(socket.is_open()) {
-        socket.receive_from(boost::asio::buffer(recv_buf.data(),frameSize), sender_endpoint);
-        out.write(recv_buf.data(), frameSize);
-        //flush frame wise
-        out.flush();
-        sleep( milliseconds(1) );
+      cerr << "sending..." << endl;
+      boost::thread transformAndSendThread;
+
+      while (true) {
+        if(transformAndSendThread.joinable())
+          transformAndSendThread.join();
+
+        boost::system::error_code ignored_error;
+        std::cin.read(readBuf, frameSize);
+        size_t cnt = std::cin.gcount();
+
+        transformAndSendThread = boost::thread([&]() {
+          for(size_t i = 0; i < cnt; i+=3) {
+            RGB rgb(readBuf[i], readBuf[i+1], readBuf[i+2]);
+            HSL hsl(rgb);
+            hsl.adjustHue(hue);
+            hsl.adjustLightness(lightness);
+            hsl.adjustSaturation(saturation);
+/*            hsl.h = (hsl.h / 360.0) * (360.0 + hue);
+            hsl.s = (hsl.s / 100.0) * (100.0 + saturation);
+            hsl.l = (hsl.l / 100.0) * (100.0 + lightness);*/
+
+
+            rgb = RGB(hsl);
+            readBuf[i] = rgb.r;
+            readBuf[i+1] = rgb.g;
+            readBuf[i+2] = rgb.b;
+          }
+
+          socket.send_to(boost::asio::buffer(readBuf, cnt),endpoint, 0, ignored_error);
+        });
 
         if(fps.next() >= fpsPrintLimit) {
-          rate = (fps.sample() + rate) / 2;
+          float sampledRate = fps.sample();
+          rate = (sampledRate + rate) / 2;
           cerr << "\rfps: " << rate;
         }
+
+        sleep( milliseconds(targetDur));
       }
+
+      cerr << "waiting..." << endl;
+      while (!hearbeat.alive()) {
+        sleep( milliseconds(100) );
+      }
+      cerr << endl << "client lost" << endl;
     }
   }
   catch (std::exception& e) {
-    std::cout << "Exception: " << e.what() << std::endl;
+    cerr << e.what() << endl;
   }
 
   return 0;
