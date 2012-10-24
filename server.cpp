@@ -2,13 +2,14 @@
 #include <ctime>
 #include <iostream>
 #include <string>
+#include <algorithm>
 #include <boost/thread.hpp>
 #include <boost/asio.hpp>
 #include <boost/lexical_cast.hpp>
 #include <unistd.h>
 #include <sys/time.h>
 #include "fps.h"
-
+#include "color.h"
 
 using boost::this_thread::sleep;
 using boost::posix_time::milliseconds;
@@ -18,7 +19,7 @@ using std::cerr;
 using std::endl;
 
 void printUsage() {
-  cerr << "Usage: server [-r][-f <frameSize>] <port>" << endl;
+  cerr << "Usage: server [-b <brightness>][-s <sampleScale>][-r][-f <frameSize>] <port>" << endl;
 }
 
 class HeartbeatReceiver {
@@ -63,20 +64,33 @@ public:
   }
 };
 
+
 int main(int argc, char** argv)
 {
   try {
     int8_t c;
     size_t frameSize = 480;
     size_t frameRate = 200;
+    float hue = 0;
+    float saturation = 0;
+    float lightness = 0;
 
-    while ((c = getopt(argc, argv, "f:r:")) != -1) {
+    while ((c = getopt(argc, argv, "h:s:l:f:r:")) != -1) {
       switch (c) {
       case 'f':
         frameSize = boost::lexical_cast<size_t>(optarg);
         break;
       case 'r':
         frameRate = boost::lexical_cast<size_t>(optarg);
+        break;
+      case 'h':
+        hue = boost::lexical_cast<float>(optarg);
+        break;
+      case 's':
+        saturation = boost::lexical_cast<float>(optarg);
+        break;
+      case 'l':
+        lightness = boost::lexical_cast<float>(optarg);
         break;
       case ':':
         printUsage();
@@ -115,7 +129,7 @@ int main(int argc, char** argv)
       if (error && error != boost::asio::error::message_size)
         throw boost::system::system_error(error);
 
-      char buffer[frameSize];
+      char readBuf[frameSize];
 
       cerr << "waiting..." << endl;
       while (!hearbeat.alive()) {
@@ -127,11 +141,32 @@ int main(int argc, char** argv)
       float targetDur = (1000.0 / frameRate);
       float rate = 1;
       fps.start();
+      cerr << "sending..." << endl;
+      boost::thread transformAndSendThread;
 
       while (hearbeat.alive()) {
+        if(transformAndSendThread.joinable())
+          transformAndSendThread.join();
+
         boost::system::error_code ignored_error;
-        std::cin.read(buffer, frameSize);
-        socket.send_to(boost::asio::buffer(buffer, std::cin.gcount()),endpoint, 0, ignored_error);
+        std::cin.read(readBuf, frameSize);
+        size_t cnt = std::cin.gcount();
+
+        transformAndSendThread = boost::thread([&]() {
+          for(size_t i = 0; i < cnt; i+=3) {
+            RGB rgb(readBuf[i], readBuf[i+1], readBuf[i+2]);
+            HSL hsl(rgb);
+            hsl.adjustHue(hue);
+            hsl.adjustSaturation(saturation);
+            hsl.adjustLightness(lightness);
+            rgb = RGB(hsl);
+            readBuf[i] = rgb.r;
+            readBuf[i+1] = rgb.g;
+            readBuf[i+2] = rgb.b;
+          }
+
+          socket.send_to(boost::asio::buffer(readBuf, cnt),endpoint, 0, ignored_error);
+        });
 
         if(fps.next() >= fpsPrintLimit) {
           float sampledRate = fps.sample();
