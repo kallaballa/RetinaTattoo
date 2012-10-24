@@ -88,15 +88,23 @@ int main(int argc, char** argv)
       float rate = 1;
       size_t fpsPrintLimit  = 100;
 
-      cerr << "receive..." << endl;
+      cerr << "receive from: " << sender_endpoint << endl;
       fps.start();
-      while(socket.is_open()) {
-        socket.receive_from(boost::asio::buffer(recv_buf.data(),frameSize), sender_endpoint);
+
+
+      for(;;) {
+        boost::thread receiverThread([&]() {
+          socket.receive_from(boost::asio::buffer(recv_buf.data(),frameSize), sender_endpoint);
+        });
+
+        if(receiverThread.timed_join(1000)) {
+          cerr << "stall client: " << sender_endpoint << endl;
+          break;
+        }
+
         out.write(recv_buf.data(), frameSize);
         //flush frame wise
         out.flush();
-        sleep( milliseconds(1) );
-
         if(fps.next() >= fpsPrintLimit) {
           rate = (fps.sample() + rate) / 2;
           cerr << "\rfps: " << rate;

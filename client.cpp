@@ -105,7 +105,7 @@ int main(int argc, char** argv)
     string host = argv[optind];
     string port = argv[optind + 1];
 
-    cerr << "connecting: " << host << ":" << port << " ..." << endl;
+    cerr << "connecting: " << host << ":" << port << endl;
 
     // set cin unbuffered
     std::cin.setf(std::ios_base::unitbuf);
@@ -150,7 +150,6 @@ int main(int argc, char** argv)
 
       cerr << "sending..." << endl;
       boost::thread transformAndSendThread;
-
 
       while (hearbeat.alive()) {
         if(transformAndSendThread.joinable())
