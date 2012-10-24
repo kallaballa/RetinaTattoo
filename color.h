@@ -14,11 +14,11 @@ struct RGB {
 };
 
 struct HSL {
-  float h,s,l;
+  int16_t h,s,l;
   HSL(const RGB& rgb);
-  void adjustHue(const float& amount);
-  void adjustSaturation(const float& amount);
-  void adjustLightness(const float& amount);
+  void adjustHue(const int16_t& amount);
+  void adjustSaturation(const int16_t& amount);
+  void adjustLightness(const int16_t& amount);
 };
 
 #endif

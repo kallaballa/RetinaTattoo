@@ -1,4 +1,5 @@
 #include "color.h"
+#include <iostream>
 
   RGB::RGB(const uint8_t& r, const uint8_t& g, const uint8_t& b) :
     r(r),
@@ -140,29 +141,36 @@
     h = (unsigned int) H;
   }
 
-  void HSL::adjustHue(const float& amount) {
+  void HSL::adjustHue(const int16_t& amount) {
     h+=amount;
-    if ( h > 360 ) {
-      h = h - 360;
-    } else if (h < 0) {
-      h +=360;
+
+    if (h < 0) {
+      h = h % -360;
+    } else if ( h > 360 ) {
+      h = h % 360;
     }
   }
 
-  void HSL::adjustSaturation(const float& amount) {
+  void HSL::adjustSaturation(const int16_t& amount) {
     s+=amount;
+    if (s < 0) {
+      s = 0;
+    }
+
     if ( s > 100 ) {
       s = 100;
-    } else if (s < 0) {
-      s = s * -1;
     }
   }
 
-  void HSL::adjustLightness(const float& amount) {
+
+  void HSL::adjustLightness(const int16_t& amount) {
     l+=amount;
+
+    if (l < 0) {
+      l = 0;
+    }
+
     if ( l > 100 ) {
       l = 100;
-    } else if (l < 0) {
-      l = l * -1;
     }
   }

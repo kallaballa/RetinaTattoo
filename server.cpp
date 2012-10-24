@@ -71,9 +71,9 @@ int main(int argc, char** argv)
     int8_t c;
     size_t frameSize = 480;
     size_t frameRate = 200;
-    float hue = 0;
-    float saturation = 0;
-    float lightness = 0;
+    int16_t hue = 0;
+    int16_t saturation = 0;
+    int16_t lightness = 0;
 
     while ((c = getopt(argc, argv, "h:s:l:f:r:")) != -1) {
       switch (c) {
@@ -84,13 +84,13 @@ int main(int argc, char** argv)
         frameRate = boost::lexical_cast<size_t>(optarg);
         break;
       case 'h':
-        hue = boost::lexical_cast<float>(optarg);
+        hue = boost::lexical_cast<int16_t>(optarg);
         break;
       case 's':
-        saturation = boost::lexical_cast<float>(optarg);
+        saturation = boost::lexical_cast<int16_t>(optarg);
         break;
       case 'l':
-        lightness = boost::lexical_cast<float>(optarg);
+        lightness = boost::lexical_cast<int16_t>(optarg);
         break;
       case ':':
         printUsage();
@@ -157,8 +157,13 @@ int main(int argc, char** argv)
             RGB rgb(readBuf[i], readBuf[i+1], readBuf[i+2]);
             HSL hsl(rgb);
             hsl.adjustHue(hue);
-            hsl.adjustSaturation(saturation);
             hsl.adjustLightness(lightness);
+            hsl.adjustSaturation(saturation);
+/*            hsl.h = (hsl.h / 360.0) * (360.0 + hue);
+            hsl.s = (hsl.s / 100.0) * (100.0 + saturation);
+            hsl.l = (hsl.l / 100.0) * (100.0 + lightness);*/
+
+
             rgb = RGB(hsl);
             readBuf[i] = rgb.r;
             readBuf[i+1] = rgb.g;
