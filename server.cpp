@@ -25,7 +25,7 @@ void printUsage() {
 class HeartbeatSender {
   udp::socket* socket;
   udp::endpoint receiverEndpoint;
-  boost::array<char, 1> buf;
+  char buf[1];
 public:
   HeartbeatSender(udp::socket* socket, const udp::endpoint& receiverEndpoint) :
     socket(socket),
@@ -65,18 +65,18 @@ int main(int argc, char** argv)
     size_t port = boost::lexical_cast<size_t>(argv[optind]);
     cerr << "listen: " << port << " ..." << endl;
 
+    boost::asio::io_service io_service;
+    udp::socket socket(io_service, udp::endpoint(udp::v4(), port));
+
+    udp::socket::native_type native_sock = socket.native();
+    int sendBufferSize = frameSize * 2;
+    setsockopt(native_sock, SOL_SOCKET, SO_RCVBUF, &sendBufferSize, sizeof(sendBufferSize));
+
+    std::vector<char> recv_buf;
+    recv_buf.reserve(frameSize);
+    udp::endpoint sender_endpoint;
+
     for(;;) {
-      boost::asio::io_service io_service;
-      udp::socket socket(io_service, udp::endpoint(udp::v4(), port));
-
-      udp::socket::native_type native_sock = socket.native();
-      int sendBufferSize = frameSize * 2;
-      setsockopt(native_sock, SOL_SOCKET, SO_RCVBUF, &sendBufferSize, sizeof(sendBufferSize));
-
-      std::vector<char> recv_buf;
-      recv_buf.reserve(frameSize);
-      udp::endpoint sender_endpoint;
-
       socket.receive_from(boost::asio::buffer(recv_buf.data(),1), sender_endpoint);
 
       HeartbeatSender heartbeat(&socket, sender_endpoint);
@@ -97,8 +97,8 @@ int main(int argc, char** argv)
           socket.receive_from(boost::asio::buffer(recv_buf.data(),frameSize), sender_endpoint);
         });
 
-        if(receiverThread.timed_join(1000)) {
-          cerr << "stall client: " << sender_endpoint << endl;
+        if(!receiverThread.timed_join(milliseconds(1000))) {
+          cerr << endl << "stall client: " << sender_endpoint << endl;
           break;
         }
 

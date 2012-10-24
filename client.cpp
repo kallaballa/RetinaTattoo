@@ -24,7 +24,7 @@ void printUsage() {
 
 class HeartbeatReceiver {
   udp::socket* socket;
-  boost::array<char, 1> buf;
+  char buf[1];
   boost::posix_time::ptime last;
   bool alive_;
   bool checked_;
