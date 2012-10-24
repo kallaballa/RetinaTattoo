@@ -140,10 +140,17 @@ int main(int argc, char** argv)
       float targetDur = (1000.0 / frameRate);
       float rate = 1;
       fps.start();
+
+      cerr << "waiting..." << endl;
+      while (!hearbeat.alive()) {
+        sleep( milliseconds(100) );
+      }
+
       cerr << "sending..." << endl;
       boost::thread transformAndSendThread;
 
-      while (true) {
+
+      while (hearbeat.alive()) {
         if(transformAndSendThread.joinable())
           transformAndSendThread.join();
 
@@ -181,10 +188,6 @@ int main(int argc, char** argv)
         sleep( milliseconds(targetDur));
       }
 
-      cerr << "waiting..." << endl;
-      while (!hearbeat.alive()) {
-        sleep( milliseconds(100) );
-      }
       cerr << endl << "client lost" << endl;
     }
   }

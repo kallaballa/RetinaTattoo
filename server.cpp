@@ -77,7 +77,7 @@ int main(int argc, char** argv)
       recv_buf.reserve(frameSize);
       udp::endpoint sender_endpoint;
 
-      socket.receive_from(boost::asio::buffer(recv_buf.data(),frameSize), sender_endpoint);
+      socket.receive_from(boost::asio::buffer(recv_buf.data(),1), sender_endpoint);
 
       HeartbeatSender heartbeat(&socket, sender_endpoint);
       boost::thread(&HeartbeatSender::run, heartbeat);
