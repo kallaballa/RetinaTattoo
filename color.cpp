@@ -154,7 +154,7 @@
   void HSL::adjustSaturation(const int16_t& amount) {
     s+=amount;
     if (s < 0) {
-      s = 0;
+      s = s * -1;
     }
 
     if ( s > 100 ) {
@@ -167,7 +167,7 @@
     l+=amount;
 
     if (l < 0) {
-      l = 0;
+      l = l * -1;
     }
 
     if ( l > 100 ) {

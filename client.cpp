@@ -134,6 +134,7 @@ int main(int argc, char** argv)
         throw boost::system::system_error(error);
 
       char readBuf[frameSize];
+      boost::system::error_code ignored_error;
 
       Fps fps;
       size_t fpsPrintLimit = 100;
@@ -143,7 +144,8 @@ int main(int argc, char** argv)
 
       cerr << "waiting..." << endl;
       while (!hearbeat.alive()) {
-        sleep( milliseconds(100) );
+        socket.send_to(boost::asio::buffer(readBuf, 1),endpoint, 0, ignored_error);
+        sleep( milliseconds(1000) );
       }
 
       cerr << "sending..." << endl;
@@ -154,7 +156,7 @@ int main(int argc, char** argv)
         if(transformAndSendThread.joinable())
           transformAndSendThread.join();
 
-        boost::system::error_code ignored_error;
+
         std::cin.read(readBuf, frameSize);
         size_t cnt = std::cin.gcount();
 
