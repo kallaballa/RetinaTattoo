@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <ctime>
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <algorithm>
 #include <boost/thread.hpp>
@@ -9,17 +10,25 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include "fps.h"
-#include "color.h"
+#include <boost/tokenizer.hpp>
+
+namespace asio = boost::asio;
+using asio::ip::udp;
 
 using boost::this_thread::sleep;
 using boost::posix_time::milliseconds;
-using boost::asio::ip::udp;
+
 using std::string;
 using std::cerr;
 using std::endl;
 
 void printUsage() {
-  cerr << "Usage: server [-b <brightness>][-s <sampleScale>][-r][-f <frameSize>] <port>" << endl;
+  cerr << "Usage: client [-d<dimension>][-r <frameRate>][-b <sendBufferSize>]<port>" << endl;
+  cerr << "[-r <frameRate>]\te.g: 24"  << endl;
+  cerr << "[-d <dimension>]\te.g: 400x400" << endl;
+  cerr << "[-b <sendBufferSize>]" << endl;
+  cerr << "<host>\thostname to connect to" << endl;
+  cerr << "<port>\tudp port of the target host" << endl;
 }
 
 class HeartbeatReceiver {
@@ -41,7 +50,7 @@ public:
     ptime now;
     udp::endpoint endpoint;
     while(!this->checked_ || this->alive_) {
-      socket->receive_from(boost::asio::buffer(buf), endpoint, 0, error);
+      socket->receive_from(asio::buffer(buf), endpoint, 0, error);
 
       if(error == boost::system::errc::success) {
         last = microsec_clock::local_time();
@@ -62,33 +71,22 @@ public:
   }
 };
 
-
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
   try {
     int8_t c;
-    size_t frameSize = 480;
+    size_t width = 0;
+    size_t height = 0;
+    size_t frameSize = 0 ;
     size_t frameRate = 200;
-    int16_t hue = 0;
-    int16_t saturation = 0;
-    int16_t lightness = 0;
+    string dim = "160x1";
 
-    while ((c = getopt(argc, argv, "h:s:l:f:r:")) != -1) {
+    while ((c = getopt(argc, argv, "r:d:f:")) != -1) {
       switch (c) {
-      case 'f':
-        frameSize = boost::lexical_cast<size_t>(optarg);
+      case 'd':
+        dim = string(optarg);
         break;
       case 'r':
         frameRate = boost::lexical_cast<size_t>(optarg);
-        break;
-      case 'h':
-        hue = boost::lexical_cast<int16_t>(optarg);
-        break;
-      case 's':
-        saturation = boost::lexical_cast<int16_t>(optarg);
-        break;
-      case 'l':
-        lightness = boost::lexical_cast<int16_t>(optarg);
         break;
       case ':':
         printUsage();
@@ -99,6 +97,13 @@ int main(int argc, char** argv)
       }
     }
 
+    boost::char_separator<char> ssep("x", "", boost::keep_empty_tokens);
+    boost::tokenizer<boost::char_separator<char> > tokComponents(dim, ssep);
+    auto it = tokComponents.begin();
+    width = boost::lexical_cast<size_t>(*it++);
+    height = boost::lexical_cast<size_t>(*it);
+    frameSize = width * height * 3;
+
     if(argc - optind < 1)
       printUsage();
 
@@ -108,7 +113,9 @@ int main(int argc, char** argv)
     cerr << "connecting: " << host << ":" << port << endl;
 
     // set cin unbuffered
-    std::cin.setf(std::ios_base::unitbuf);
+    auto& in = std::cin;
+//    std::ifstream in("/dev/urandom");
+    in.setf(std::ios_base::unitbuf);
 
     //prepare the udp socket
     boost::asio::io_service io_service;
@@ -134,6 +141,7 @@ int main(int argc, char** argv)
         throw boost::system::system_error(error);
 
       char readBuf[frameSize];
+
       boost::system::error_code ignored_error;
 
       Fps fps;
@@ -143,41 +151,47 @@ int main(int argc, char** argv)
       fps.start();
 
       cerr << "waiting..." << endl;
+      char hb[1] = { 0 };
       while (!hearbeat.alive()) {
-        socket.send_to(boost::asio::buffer(readBuf, 1),endpoint, 0, ignored_error);
+        socket.send_to(boost::asio::buffer(hb, 1),endpoint, 0, ignored_error);
         sleep( milliseconds(1000) );
       }
 
       cerr << "sending..." << endl;
       boost::thread transformAndSendThread;
+      char rowBuf[width * 3];
+
+      std::cerr << "size:" << frameSize
+          << " width:" << width
+          << " height:" << height << std::endl;
 
       while (hearbeat.alive()) {
         if(transformAndSendThread.joinable())
           transformAndSendThread.join();
 
-
-        std::cin.read(readBuf, frameSize);
-        size_t cnt = std::cin.gcount();
-
+        in.read(readBuf, frameSize);
+        bool forward = true;
         transformAndSendThread = boost::thread([&]() {
-          for(size_t i = 0; i < cnt; i+=3) {
-            RGB rgb(readBuf[i], readBuf[i+1], readBuf[i+2]);
-            HSL hsl(rgb);
-            hsl.adjustHue(hue);
-            hsl.adjustLightness(lightness);
-            hsl.adjustSaturation(saturation);
-/*            hsl.h = (hsl.h / 360.0) * (360.0 + hue);
-            hsl.s = (hsl.s / 100.0) * (100.0 + saturation);
-            hsl.l = (hsl.l / 100.0) * (100.0 + lightness);*/
+          for(size_t y = 0; y < height; y++) {
+            for(size_t x = 0; x < (width * 3); x+=3) {
+              size_t off = y * width * 3;
 
+              if(!forward) {
+                rowBuf[x] = readBuf[off + x];
+                rowBuf[x + 1] = readBuf[off + x + 1];
+                rowBuf[x + 2] = readBuf[off + x + 2];
+              } else {
+                rowBuf[(width*3) - x - 3] = readBuf[off + x];
+                rowBuf[(width*3) - x - 2] = readBuf[off + x + 1];
+                rowBuf[(width*3) - x - 1] = readBuf[off + x + 2];
+              }
+            }
 
-            rgb = RGB(hsl);
-            readBuf[i] = rgb.r;
-            readBuf[i+1] = rgb.g;
-            readBuf[i+2] = rgb.b;
+            forward = !forward;
+            memcpy(readBuf + (width * 3 * y), rowBuf, width * 3);
           }
 
-          socket.send_to(boost::asio::buffer(readBuf, cnt),endpoint, 0, ignored_error);
+          socket.send_to(asio::buffer(readBuf, frameSize),endpoint, 0, ignored_error);
         });
 
         if(fps.next() >= fpsPrintLimit) {

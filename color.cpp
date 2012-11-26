@@ -1,13 +1,13 @@
 #include "color.h"
 #include <iostream>
 
-  RGB::RGB(const uint8_t& r, const uint8_t& g, const uint8_t& b) :
+  RGBPix::RGBPix(const uint8_t& r, const uint8_t& g, const uint8_t& b) :
     r(r),
     g(g),
     b(b) {
   }
 
-  RGB::RGB(const HSL& hsl) :
+  RGBPix::RGBPix(const HSLPix& hsl) :
       r(0), g(0), b(0) {
     float L = ((float) hsl.l) / 100;
     float S = ((float) hsl.s) / 100;
@@ -60,14 +60,14 @@
     b = (unsigned int) ((((float) b) / 100) * 255);
   }
 
-  RGB::RGB(const uint32_t& v) :
+  RGBPix::RGBPix(const uint32_t& v) :
     r((uint8_t)((v>>16)&0xFF)),
     g((uint8_t)((v>>8)&0xFF)),
     b((uint8_t)(v&0xFF)){
   }
 
   // This is a subfunction of HSLtoRGB
-  void RGB::HSLtoRGB_Subfunction(uint8_t& c, const float& temp1, const float& temp2,
+  void RGBPix::HSLtoRGB_Subfunction(uint8_t& c, const float& temp1, const float& temp2,
       const float& temp3) {
     if ((temp3 * 6) < 1)
       c = (unsigned int) ((temp2 + (temp1 - temp2) * 6 * temp3) * 100);
@@ -81,12 +81,12 @@
     return;
   }
 
-  const uint32_t RGB::val() const {
+  const uint32_t RGBPix::val() const {
     return ((uint32_t)r<<16) | ((uint32_t)g<<8) | b;
   }
 
 
-  HSL::HSL(const RGB& rgb) {
+  HSLPix::HSLPix(const RGBPix& rgb) {
     float r_percent = ((float) rgb.r) / 255;
     float g_percent = ((float) rgb.g) / 255;
     float b_percent = ((float) rgb.b) / 255;
@@ -141,7 +141,7 @@
     h = (unsigned int) H;
   }
 
-  void HSL::adjustHue(const int16_t& amount) {
+  void HSLPix::adjustHue(const int16_t& amount) {
     h+=amount;
 
     if (h < 0) {
@@ -151,7 +151,7 @@
     }
   }
 
-  void HSL::adjustSaturation(const int16_t& amount) {
+  void HSLPix::adjustSaturation(const int16_t& amount) {
     s+=amount;
     if (s < 0) {
       s = s * -1;
@@ -163,7 +163,7 @@
   }
 
 
-  void HSL::adjustLightness(const int16_t& amount) {
+  void HSLPix::adjustLightness(const int16_t& amount) {
     l+=amount;
 
     if (l < 0) {
