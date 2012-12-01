@@ -38,7 +38,7 @@ cd RetinaTattoo/scripts
 </pre>
 
 It's also possible to capture a X11 window and stream it directly to a LED Matrix, but i haven't written easy-to-use scripts for that yet. feel free to bug me :)
-anyway, there's a video of us using the technique to play super mario bros. (Super Mario LED Matrix)[http://vimeo.com/54252456]
+anyway, there's a video of us using the technique to play super mario bros. [Super Mario LED Matrix](http://vimeo.com/54252456]
 
 == Featuring articles ==
 
