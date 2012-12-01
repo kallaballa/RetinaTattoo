@@ -1,6 +1,6 @@
 CC = g++
 CFLAGS =-O3 -Wall -std=c++0x
-LDFLAGS =-L/lib64 -lboost_thread -lboost_system -lpthread
+LDFLAGS =-L/lib -lboost_thread -lboost_system -lpthread
 
 all: 
 	$(CC) $(CFLAGS) $(LDFLAGS) client.cpp -o client
