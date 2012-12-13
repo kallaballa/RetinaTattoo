@@ -16,7 +16,7 @@ On the raspberry:
 git clone https://github.com/Metalab/RetinaTattoo.git
 
 # install dependencies
-apt-get install build-essential libboost-system-dev libboost-thread-dev
+apt-get install build-essential libboost-system-dev libboost-thread-dev g++-4.7
 
 # build it
 cd RetinaTattoo
