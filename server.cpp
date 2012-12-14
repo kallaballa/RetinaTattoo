@@ -11,10 +11,12 @@
 #include <boost/lexical_cast.hpp>
 #include "fps.h"
 #include "color.h"
+#include <bitset>
 #include <boost/tokenizer.hpp>
 
 using namespace boost::posix_time;
 using namespace boost::this_thread;
+using std::bitset;
 using boost::asio::ip::udp;
 using std::string;
 using std::cerr;
@@ -51,39 +53,10 @@ public:
   }
 };
 
-enum RGB_Format{
-  RGB,
-  RBG,
-  BGR,
-  BRG,
-  GRB,
-  GBR
-};
-
-RGB_Format parseFormat(const string& s) {
-  if(s == "rgb") {
-    return RGB;
-  } else if(s == "rbg") {
-    return RBG;
-  } else if(s == "bgr") {
-    return BGR;
-  } else if(s == "brg") {
-    return BRG;
-  } else if(s == "grb") {
-    return GRB;
-  } else if(s == "gbr") {
-    return GBR;
-  } else {
-    printUsage();
-    return RGB;
-  }
-}
-
 int main(int argc, char** argv) {
   try
   {
     int8_t c;
-    size_t frameSize = 0;
     string outputFile = "/dev/spidev0.0";
     string dim;
     size_t width = 0;
@@ -91,7 +64,6 @@ int main(int argc, char** argv) {
     int16_t hue = 0;
     int16_t saturation = 0;
     int16_t lightness = 0;
-    RGB_Format pixFormat = RGB;
     bool alternateScanOrder = false;
     while ((c = getopt(argc, argv, "ah:s:l:f:o:d:")) != -1) {
       switch (c) {
@@ -99,7 +71,6 @@ int main(int argc, char** argv) {
         alternateScanOrder = true;
         break;
       case 'f':
-        pixFormat = parseFormat(string(optarg));
         break;
       case 'd':
         dim = string(optarg);
@@ -130,7 +101,7 @@ int main(int argc, char** argv) {
     auto it = tokComponents.begin();
     width = boost::lexical_cast<size_t>(*it++);
     height = boost::lexical_cast<size_t>(*it);
-    frameSize = width * height * 3;
+    const size_t frameSize = width * height;
 
     if(argc - optind < 1)
       printUsage();
@@ -145,7 +116,7 @@ int main(int argc, char** argv) {
     int sendBufferSize = frameSize * 2;
     setsockopt(native_sock, SOL_SOCKET, SO_RCVBUF, &sendBufferSize, sizeof(sendBufferSize));
 
-    char rowBuf[width * 3];
+    char rowBuf[width];
     char recv_buf[frameSize];
     udp::endpoint sender_endpoint;
 
@@ -163,70 +134,16 @@ int main(int argc, char** argv) {
 
       cerr << "receive from: " << sender_endpoint << endl;
       fps.start();
-      bool flipRow = false;
+
+      std::bitset<800> fb;
 
       for(;;) {
         boost::thread receiverThread([&]() {
           socket.receive_from(boost::asio::buffer(recv_buf,frameSize), sender_endpoint);
             for(size_t y = 0; y < height; y++) {
-              for(size_t x = 0; x < (width * 3); x+=3) {
-                size_t off = y * width * 3;
-
-                RGBPix rgb(recv_buf[off + x], recv_buf[off + x + 1], recv_buf[off + x + 2]);
-                HSLPix hsl(rgb);
-                hsl.adjustHue(hue);
-                hsl.adjustLightness(lightness);
-                hsl.adjustSaturation(saturation);
-
-                rgb = RGBPix(hsl);
-                size_t one,two,three;
-
-                if(!alternateScanOrder || !flipRow) {
-                  one = x;
-                  two = x + 1;
-                  three = x + 2;
-                } else {
-                  one = (width*3) - x - 3;
-                  two = (width*3) - x - 2;
-                  three = (width*3) - x - 1;
-                }
-
-                switch(pixFormat) {
-                  case RGB:
-                    rowBuf[one] = rgb.r;
-                    rowBuf[two] = rgb.g;
-                    rowBuf[three] = rgb.b;
-                  break;
-                  case RBG:
-                    rowBuf[one] = rgb.r;
-                    rowBuf[two] = rgb.b;
-                    rowBuf[x + 2] = rgb.g;
-                  break;
-                  case GRB:
-                    rowBuf[one] = rgb.g;
-                    rowBuf[two] = rgb.r;
-                    rowBuf[three] = rgb.b;
-                    break;
-                  case GBR:
-                    rowBuf[one] = rgb.g;
-                    rowBuf[two] = rgb.b;
-                    rowBuf[three] = rgb.r;
-                    break;
-                  case BRG:
-                    rowBuf[one] = rgb.b;
-                    rowBuf[two] = rgb.r;
-                    rowBuf[three] = rgb.g;
-                    break;
-                  case BGR:
-                    rowBuf[one] = rgb.b;
-                    rowBuf[two] = rgb.g;
-                    rowBuf[three] = rgb.r;
-                    break;
-                }
+              for(size_t x = 0; x < width; x++) {
+                fb[ x * y ] = recv_buf[ x * y ] > 128;
               }
-
-              flipRow = !flipRow;
-              memcpy(recv_buf + (width * 3 * y), rowBuf, width * 3);
             }
         });
 
@@ -235,7 +152,7 @@ int main(int argc, char** argv) {
           break;
         }
 
-        out.write(recv_buf, frameSize);
+        out.write(fb.to_string().data(), frameSize);
         //flush frame wise
         out.flush();
 
