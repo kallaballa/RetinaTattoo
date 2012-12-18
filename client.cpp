@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
     auto it = tokComponents.begin();
     width = boost::lexical_cast<size_t>(*it++);
     height = boost::lexical_cast<size_t>(*it);
-    frameSize = width * height * 3;
+    frameSize = width * height;
 
     if(argc - optind < 1)
       printUsage();
@@ -158,39 +158,22 @@ int main(int argc, char** argv) {
       }
 
       cerr << "sending..." << endl;
-      boost::thread transformAndSendThread;
-      char rowBuf[width * 3];
+      boost::thread sendThread;
 
       std::cerr << "size:" << frameSize
           << " width:" << width
           << " height:" << height << std::endl;
 
       while (hearbeat.alive()) {
-        if(transformAndSendThread.joinable())
-          transformAndSendThread.join();
-
+        if(sendThread.joinable())
+          sendThread.join();
+        if(!in) {
+          std::cerr << "end of stream" << std::endl;
+          exit(0);
+        }
         in.read(readBuf, frameSize);
         bool forward = true;
-        transformAndSendThread = boost::thread([&]() {
-          for(size_t y = 0; y < height; y++) {
-            for(size_t x = 0; x < (width * 3); x+=3) {
-              size_t off = y * width * 3;
-
-              if(!forward) {
-                rowBuf[x] = readBuf[off + x];
-                rowBuf[x + 1] = readBuf[off + x + 1];
-                rowBuf[x + 2] = readBuf[off + x + 2];
-              } else {
-                rowBuf[(width*3) - x - 3] = readBuf[off + x];
-                rowBuf[(width*3) - x - 2] = readBuf[off + x + 1];
-                rowBuf[(width*3) - x - 1] = readBuf[off + x + 2];
-              }
-            }
-
-            forward = !forward;
-            memcpy(readBuf + (width * 3 * y), rowBuf, width * 3);
-          }
-
+        sendThread = boost::thread([&]() {
           socket.send_to(asio::buffer(readBuf, frameSize),endpoint, 0, ignored_error);
         });
 
