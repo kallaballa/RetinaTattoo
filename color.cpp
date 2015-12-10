@@ -1,4 +1,5 @@
-#include "color.h"
+#include "color.hpp"
+
 #include <iostream>
 
   RGBPix::RGBPix(const uint8_t& r, const uint8_t& g, const uint8_t& b) :

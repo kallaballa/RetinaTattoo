@@ -9,9 +9,11 @@
 #include <boost/thread/thread.hpp>
 #include <boost/asio.hpp>
 #include <boost/lexical_cast.hpp>
-#include "fps.h"
-#include "color.h"
 #include <boost/tokenizer.hpp>
+
+#include "color.hpp"
+#include "fps.hpp"
+#include "mapping.hpp"
 
 using namespace boost::this_thread;
 using namespace boost::posix_time;
@@ -85,6 +87,7 @@ int main(int argc, char** argv) {
     int8_t c;
     size_t frameSize = 0;
     string outputFile = "/dev/spidev0.0";
+    string mappingFile = "/dev/spidev0.0";
     string dim;
     size_t width = 0;
     size_t height = 0;
@@ -93,13 +96,18 @@ int main(int argc, char** argv) {
     int16_t lightness = 0;
     RGB_Format pixFormat = RGB;
     bool alternateScanOrder = false;
-    while ((c = getopt(argc, argv, "ah:s:l:f:o:d:")) != -1) {
+    LedMapping map;
+
+    while ((c = getopt(argc, argv, "ah:s:l:f:o:d:m:")) != -1) {
       switch (c) {
       case 'a':
         alternateScanOrder = true;
         break;
       case 'f':
         pixFormat = parseFormat(string(optarg));
+        break;
+      case 'm':
+        mappingFile = string(optarg);
         break;
       case 'd':
         dim = string(optarg);
@@ -125,11 +133,26 @@ int main(int argc, char** argv) {
       }
     }
 
+    if(!dim.empty() && !mappingFile.empty()) {
+      std::cerr << "You can't specify both a dimension and a mapping file" << std::endl;
+      exit(1);
+    }
+
     boost::char_separator<char> ssep("x", "", boost::keep_empty_tokens);
-    boost::tokenizer<boost::char_separator<char> > tokComponents(dim, ssep);
-    auto it = tokComponents.begin();
-    width = boost::lexical_cast<size_t>(*it++);
-    height = boost::lexical_cast<size_t>(*it);
+    if(!dim.empty()) {
+      boost::tokenizer<boost::char_separator<char> > tokComponents(dim, ssep);
+      auto it = tokComponents.begin();
+      width = boost::lexical_cast<size_t>(*it++);
+      height = boost::lexical_cast<size_t>(*it);
+    } else if(mappingFile.empty()) {
+      std::cerr << "You need to  specify either a dimension or a mapping file" << std::endl;
+      exit(1);
+    } else {
+      map = readMappingFile(mappingFile);
+      width = map.width();
+      height = map.height();
+    }
+
     frameSize = width * height * 3;
 
     if(argc - optind < 1)
@@ -145,8 +168,12 @@ int main(int argc, char** argv) {
     int sockBufferSize = frameSize * 2;
     setsockopt(nativeSock, SOL_SOCKET, SO_RCVBUF, &sockBufferSize, sizeof(sockBufferSize));
 
+
     char rowBuf[width * 3];
     char recv_buf[frameSize];
+
+    const size_t frameBufferSize = map.numLeds() * 3;
+    char frameBuffer[frameBufferSize];
     udp::endpoint sender_endpoint;
 
     for(;;) {
@@ -235,7 +262,23 @@ int main(int argc, char** argv) {
           break;
         }
 
-        out.write(recv_buf, frameSize);
+        for(size_t y = 0; y < height; y++) {
+          for(size_t x = 0; x < (width * 3); x+=3) {
+            size_t off = y * width * 3;
+
+            char& c1 = recv_buf[off + x];
+            char& c2 = recv_buf[off + x + 1];
+            char& c3 = recv_buf[off + x + 2];
+
+            for(const size_t& pos : map[{x,y}]) {
+              frameBuffer[pos * 3] = c1;
+              frameBuffer[pos * 3 + 1] = c2;
+              frameBuffer[pos * 3 + 2] = c3;
+            }
+          }
+        }
+
+        out.write(frameBuffer, frameBufferSize);
         //flush frame wise
         out.flush();
 

@@ -9,8 +9,8 @@
 #include <boost/lexical_cast.hpp>
 #include <unistd.h>
 #include <sys/time.h>
-#include "fps.h"
 #include <boost/tokenizer.hpp>
+#include "fps.hpp"
 
 namespace asio = boost::asio;
 using asio::ip::udp;

@@ -4,8 +4,8 @@ LDFLAGS =-L/lib -lboost_thread -lboost_system -lpthread
 
 all: 
 	$(CC) $(CFLAGS) $(LDFLAGS) client.cpp -o client
-	$(CC) $(CFLAGS) $(LDFLAGS) server.cpp color.cpp -o server
+	$(CC) $(CFLAGS) $(LDFLAGS) server.cpp color.cpp mapping.cpp -o server
 
 clean:
-	$(RM) client.o client.d server.o server.d client server
+	$(RM) client.o client.d server.o mapping.o server.d client server
 
