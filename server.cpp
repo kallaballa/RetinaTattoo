@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
     int16_t lightness = 0;
     RGB_Format pixFormat = RGB;
     bool alternateScanOrder = false;
-    LedMapping map;
+    LedMapping map(0,0,0);
 
     while ((c = getopt(argc, argv, "ah:s:l:f:o:d:m:")) != -1) {
       switch (c) {
@@ -262,25 +262,31 @@ int main(int argc, char** argv) {
           break;
         }
 
-        for(size_t y = 0; y < height; y++) {
-          for(size_t x = 0; x < (width * 3); x+=3) {
-            size_t off = y * width * 3;
+        if(map.numLeds() > 0) {
+          for(size_t y = 0; y < height; y++) {
+            for(size_t x = 0; x < (width * 3); x+=3) {
+              size_t off = y * width * 3;
 
-            char& c1 = recv_buf[off + x];
-            char& c2 = recv_buf[off + x + 1];
-            char& c3 = recv_buf[off + x + 2];
+              char& c1 = recv_buf[off + x];
+              char& c2 = recv_buf[off + x + 1];
+              char& c3 = recv_buf[off + x + 2];
 
-            for(const size_t& pos : map[{x,y}]) {
-              frameBuffer[pos * 3] = c1;
-              frameBuffer[pos * 3 + 1] = c2;
-              frameBuffer[pos * 3 + 2] = c3;
+              for(const size_t& pos : map[{x,y}]) {
+                frameBuffer[pos * 3] = c1;
+                frameBuffer[pos * 3 + 1] = c2;
+                frameBuffer[pos * 3 + 2] = c3;
+              }
             }
           }
-        }
+          out.write(frameBuffer, frameBufferSize);
+          //flush frame wise
+          out.flush();
+        } else {
+          out.write(recv_buf, frameSize);
+          //flush frame wise
+          out.flush();
 
-        out.write(frameBuffer, frameBufferSize);
-        //flush frame wise
-        out.flush();
+        }
 
         if(fps.next() >= fpsPrintLimit) {
           rate = (fps.sample() + rate) / 2;
