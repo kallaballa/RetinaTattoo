@@ -13,8 +13,8 @@
 #include "color.h"
 #include <boost/tokenizer.hpp>
 
-using namespace boost::posix_time;
 using namespace boost::this_thread;
+using namespace boost::posix_time;
 using boost::asio::ip::udp;
 using std::string;
 using std::cerr;
@@ -141,9 +141,9 @@ int main(int argc, char** argv) {
     boost::asio::io_service io_service;
     udp::socket socket(io_service, udp::endpoint(udp::v4(), port));
 
-    udp::socket::native_type native_sock = socket.native();
-    int sendBufferSize = frameSize * 2;
-    setsockopt(native_sock, SOL_SOCKET, SO_RCVBUF, &sendBufferSize, sizeof(sendBufferSize));
+    udp::socket::native_type nativeSock = socket.native();
+    int sockBufferSize = frameSize * 2;
+    setsockopt(nativeSock, SOL_SOCKET, SO_RCVBUF, &sockBufferSize, sizeof(sockBufferSize));
 
     char rowBuf[width * 3];
     char recv_buf[frameSize];
