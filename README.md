@@ -13,7 +13,7 @@ The following procedure scales and streams the video to the LED Matrix, and also
 On the raspberry:
 <pre>
 # clone the RetinaTattoo repository
-git clone https://github.com/Metalab/RetinaTattoo.git
+git clone https://github.com/kallaballa/RetinaTattoo.git
 
 # install dependencies
 apt-get install build-essential libboost-system-dev libboost-thread-dev g++-4.7
