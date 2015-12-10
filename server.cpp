@@ -271,7 +271,11 @@ int main(int argc, char** argv) {
               char& c2 = recv_buf[off + x + 1];
               char& c3 = recv_buf[off + x + 2];
 
-              for(const size_t& pos : map[{x,y}]) {
+              Coordinate coord;
+              coord.x = x;
+              coord.y = y;
+
+              for(const size_t& pos : map[coord]) {
                 frameBuffer[pos * 3] = c1;
                 frameBuffer[pos * 3 + 1] = c2;
                 frameBuffer[pos * 3 + 2] = c3;
