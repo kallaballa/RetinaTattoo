@@ -6,16 +6,16 @@
 #include <unistd.h>
 #include <sys/time.h>
 
-#include <boost/thread/thread.hpp>
 #include <boost/asio.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/tokenizer.hpp>
+#include <boost/thread.hpp>
 
+#include "heartbeat.hpp"
 #include "color.hpp"
 #include "fps.hpp"
 #include "mapping.hpp"
 
-using namespace boost::this_thread;
 using namespace boost::posix_time;
 using boost::asio::ip::udp;
 using std::string;
@@ -35,59 +35,13 @@ void printUsage() {
   cerr << "<port>" << endl;
 }
 
-class HeartbeatSender {
-  udp::socket* socket;
-  udp::endpoint receiverEndpoint;
-  char buf[1];
-public:
-  HeartbeatSender(udp::socket* socket, const udp::endpoint& receiverEndpoint) :
-    socket(socket),
-    receiverEndpoint(receiverEndpoint) {
-        buf[0] = 0;
-    }
-  void run() {
-    for(;;) {
-      socket->send_to(boost::asio::buffer(buf), receiverEndpoint);
-      boost::this_thread::sleep(milliseconds(300));
-    }
-  }
-};
-
-enum RGB_Format{
-  RGB,
-  RBG,
-  BGR,
-  BRG,
-  GRB,
-  GBR
-};
-
-RGB_Format parseFormat(const string& s) {
-  if(s == "rgb") {
-    return RGB;
-  } else if(s == "rbg") {
-    return RBG;
-  } else if(s == "bgr") {
-    return BGR;
-  } else if(s == "brg") {
-    return BRG;
-  } else if(s == "grb") {
-    return GRB;
-  } else if(s == "gbr") {
-    return GBR;
-  } else {
-    printUsage();
-    return RGB;
-  }
-}
-
 int main(int argc, char** argv) {
   try
   {
     int8_t c;
     size_t frameSize = 0;
     string outputFile = "/dev/spidev0.0";
-    string mappingFile = "/dev/spidev0.0";
+    string mappingFile;
     string dim;
     size_t width = 0;
     size_t height = 0;
@@ -133,6 +87,11 @@ int main(int argc, char** argv) {
       }
     }
 
+    if(pixFormat == INVALID) {
+      std::cerr << "Illegal pixel format!" << std::endl;
+      printUsage();
+      exit(1);
+    }
     if(!dim.empty() && !mappingFile.empty()) {
       std::cerr << "You can't specify both a dimension and a mapping file" << std::endl;
       exit(1);
@@ -169,11 +128,11 @@ int main(int argc, char** argv) {
     setsockopt(nativeSock, SOL_SOCKET, SO_RCVBUF, &sockBufferSize, sizeof(sockBufferSize));
 
 
-    char rowBuf[width * 3];
-    char recv_buf[frameSize];
+    char* rowBuf = new char[width * 3];
+    char* recv_buf = new char[frameSize];
 
     const size_t frameBufferSize = map.numLeds() * 3;
-    char frameBuffer[frameBufferSize];
+    char* frameBuffer = new char[frameBufferSize];
     udp::endpoint sender_endpoint;
 
     for(;;) {
@@ -249,6 +208,9 @@ int main(int argc, char** argv) {
                     rowBuf[two] = rgb.g;
                     rowBuf[three] = rgb.r;
                     break;
+                  case INVALID:
+                    assert(false);
+                    break;
                 }
               }
 
@@ -272,9 +234,10 @@ int main(int argc, char** argv) {
               char& c3 = recv_buf[off + x + 2];
 
               Coordinate coord;
-              coord.x = x;
+              coord.x = x / 3;
               coord.y = y;
-
+              std::cerr << coord.x << "/" << coord.y << std::endl;
+              assert(map.find(coord) != map.end());
               for(const size_t& pos : map[coord]) {
                 frameBuffer[pos * 3] = c1;
                 frameBuffer[pos * 3 + 1] = c2;
@@ -285,6 +248,7 @@ int main(int argc, char** argv) {
           out.write(frameBuffer, frameBufferSize);
           //flush frame wise
           out.flush();
+          memset(frameBuffer, 0, frameBufferSize);
         } else {
           out.write(recv_buf, frameSize);
           //flush frame wise
@@ -301,6 +265,7 @@ int main(int argc, char** argv) {
   }
   catch (std::exception& e) {
     std::cout << "Exception: " << e.what() << std::endl;
+    exit(1);
   }
 
   return 0;

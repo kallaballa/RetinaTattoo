@@ -1,7 +1,22 @@
-#include <stdint.h>
-
 #ifndef HSL2RGB_H
 #define HSL2RGB_H
+
+#include <stdint.h>
+#include <string>
+
+using std::string;
+
+enum RGB_Format{
+  RGB,
+  RBG,
+  BGR,
+  BRG,
+  GRB,
+  GBR,
+  INVALID
+};
+
+RGB_Format parseFormat(const string& s);
 
 class HSLPix;
 struct RGBPix {
