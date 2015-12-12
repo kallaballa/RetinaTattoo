@@ -29,7 +29,6 @@ void printUsage() {
   cerr << "[-h <hue>]\t0 to 360" << endl;  
   cerr << "[-s <saturation>]\t-100 to 100" << endl;
   cerr << "[-l <lightness>]\t-100 to 100" << endl;
-  cerr << "[-a]\talternate scan order" << endl;
   cerr << "[-f]\t Pixel format - one of: rgb, rbg, gbr, grb, bgr, brg" << endl;
   cerr << "[-o <device>]\toutput device (default: /dev/spidev0.0)" << endl;
   cerr << "<port>" << endl;
@@ -49,14 +48,10 @@ int main(int argc, char** argv) {
     int16_t saturation = 0;
     int16_t lightness = 0;
     RGB_Format pixFormat = RGB;
-    bool alternateScanOrder = false;
-    LedMapping map(0,0,0);
+    LedMapping map;
 
-    while ((c = getopt(argc, argv, "ah:s:l:f:o:d:m:")) != -1) {
+    while ((c = getopt(argc, argv, "h:s:l:f:o:d:m:")) != -1) {
       switch (c) {
-      case 'a':
-        alternateScanOrder = true;
-        break;
       case 'f':
         pixFormat = parseFormat(string(optarg));
         break;
@@ -124,14 +119,14 @@ int main(int argc, char** argv) {
     udp::socket socket(io_service, udp::endpoint(udp::v4(), port));
 
     udp::socket::native_type nativeSock = socket.native();
-    int sockBufferSize = frameSize * 2;
+    const int sockBufferSize = frameSize * 2;
     setsockopt(nativeSock, SOL_SOCKET, SO_RCVBUF, &sockBufferSize, sizeof(sockBufferSize));
 
 
     char* rowBuf = new char[width * 3];
     char* recv_buf = new char[frameSize];
 
-    const size_t frameBufferSize = map.numLeds() * 3;
+    const size_t frameBufferSize = (map.maxLedIndex() + 1) * 3;
     char* frameBuffer = new char[frameBufferSize];
     udp::endpoint sender_endpoint;
 
@@ -167,7 +162,7 @@ int main(int argc, char** argv) {
                 rgb = RGBPix(hsl);
                 size_t one,two,three;
 
-                if(!alternateScanOrder || !flipRow) {
+                if(y % 2 == 0) {
                   one = x;
                   two = x + 1;
                   three = x + 2;
@@ -224,7 +219,8 @@ int main(int argc, char** argv) {
           break;
         }
 
-        if(map.numLeds() > 0) {
+        if(map.maxLedIndex() > 0) {
+          Coordinate coord;
           for(size_t y = 0; y < height; y++) {
             for(size_t x = 0; x < (width * 3); x+=3) {
               size_t off = y * width * 3;
@@ -233,12 +229,12 @@ int main(int argc, char** argv) {
               char& c2 = recv_buf[off + x + 1];
               char& c3 = recv_buf[off + x + 2];
 
-              Coordinate coord;
-              coord.x = x / 3;
-              coord.y = y;
-              std::cerr << coord.x << "/" << coord.y << std::endl;
+              coord.x_ = x / 3;
+              coord.y_ = y;
+
               assert(map.find(coord) != map.end());
               for(const size_t& pos : map[coord]) {
+                assert(pos * 3 + 2 < frameBufferSize);
                 frameBuffer[pos * 3] = c1;
                 frameBuffer[pos * 3 + 1] = c2;
                 frameBuffer[pos * 3 + 2] = c3;
@@ -264,7 +260,7 @@ int main(int argc, char** argv) {
     }
   }
   catch (std::exception& e) {
-    std::cout << "Exception: " << e.what() << std::endl;
+    std::cout << e.what() << std::endl;
     exit(1);
   }
 
