@@ -153,13 +153,13 @@ int main(int argc, char** argv) {
               for(size_t x = 0; x < (width * 3); x+=3) {
                 size_t off = y * width * 3;
 
-                RGBPix rgb(recv_buf[off + x], recv_buf[off + x + 1], recv_buf[off + x + 2]);
-                HSLPix hsl(rgb);
+                RGBColor rgb(recv_buf[off + x], recv_buf[off + x + 1], recv_buf[off + x + 2]);
+                HSLColor hsl(rgb);
                 hsl.adjustHue(hue);
                 hsl.adjustLightness(lightness);
                 hsl.adjustSaturation(saturation);
 
-                rgb = RGBPix(hsl);
+                rgb = RGBColor(hsl);
                 size_t one,two,three;
 
                 if(y % 2 == 0) {
@@ -174,34 +174,34 @@ int main(int argc, char** argv) {
 
                 switch(pixFormat) {
                   case RGB:
-                    rowBuf[one] = rgb.r;
-                    rowBuf[two] = rgb.g;
-                    rowBuf[three] = rgb.b;
+                    rowBuf[one] = rgb.r_;
+                    rowBuf[two] = rgb.g_;
+                    rowBuf[three] = rgb.b_;
                   break;
                   case RBG:
-                    rowBuf[one] = rgb.r;
-                    rowBuf[two] = rgb.b;
-                    rowBuf[x + 2] = rgb.g;
+                    rowBuf[one] = rgb.r_;
+                    rowBuf[two] = rgb.b_;
+                    rowBuf[x + 2] = rgb.g_;
                   break;
                   case GRB:
-                    rowBuf[one] = rgb.g;
-                    rowBuf[two] = rgb.r;
-                    rowBuf[three] = rgb.b;
+                    rowBuf[one] = rgb.g_;
+                    rowBuf[two] = rgb.r_;
+                    rowBuf[three] = rgb.b_;
                     break;
                   case GBR:
-                    rowBuf[one] = rgb.g;
-                    rowBuf[two] = rgb.b;
-                    rowBuf[three] = rgb.r;
+                    rowBuf[one] = rgb.g_;
+                    rowBuf[two] = rgb.b_;
+                    rowBuf[three] = rgb.r_;
                     break;
                   case BRG:
-                    rowBuf[one] = rgb.b;
-                    rowBuf[two] = rgb.r;
-                    rowBuf[three] = rgb.g;
+                    rowBuf[one] = rgb.b_;
+                    rowBuf[two] = rgb.r_;
+                    rowBuf[three] = rgb.g_;
                     break;
                   case BGR:
-                    rowBuf[one] = rgb.b;
-                    rowBuf[two] = rgb.g;
-                    rowBuf[three] = rgb.r;
+                    rowBuf[one] = rgb.b_;
+                    rowBuf[two] = rgb.g_;
+                    rowBuf[three] = rgb.r_;
                     break;
                   case INVALID:
                     assert(false);
@@ -249,7 +249,6 @@ int main(int argc, char** argv) {
           out.write(recv_buf, frameSize);
           //flush frame wise
           out.flush();
-
         }
 
         if(fps.next() >= fpsPrintLimit) {

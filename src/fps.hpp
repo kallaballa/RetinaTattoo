@@ -1,6 +1,7 @@
 #ifndef FPS_HPP_
 #define FPS_HPP_
 
+#include <boost/thread.hpp>
 using boost::posix_time::ptime;
 using boost::posix_time::time_period;
 using boost::posix_time::microsec_clock;

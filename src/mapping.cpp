@@ -137,13 +137,12 @@ LedMapping readMappingFile(const string& filename) {
 }
 
 /*
- *  Check max index matches.
- *  Check all coordinates mapped.
- *  Check coordinates double allocated.
- *  Check all led positions used.
+ * Check max index matches.
+ * Check all coordinates mapped.
+ * Check coordinates double allocated.
+ * Check all led positions used.
  * Check led positions double allocated.
  */
-
 void LedMapping::check() {
   std::set<Coordinate, CoordComp> sCoord;
   std::set<LedPositions::value_type> sPositions;

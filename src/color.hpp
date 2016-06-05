@@ -18,19 +18,25 @@ enum RGB_Format{
 
 RGB_Format parseFormat(const string& s);
 
-class HSLPix;
-struct RGBPix {
-  uint8_t r,g,b;
-  RGBPix(const uint8_t& r, const uint8_t& g, const uint8_t& b);
-  RGBPix(const HSLPix& hsl);
-  RGBPix(const uint32_t& v);
-  void HSLtoRGB_Subfunction(uint8_t& c, const float& temp1, const float& temp2, const float& temp3);
+class HSLColor;
+class RGBColor {
+  void HSLtoRGB_Subfunction(int16_t& c, const float& temp1, const float& temp2, const float& temp3);
+public:
+  int16_t r_,g_,b_;
+  RGBColor(const int16_t& r, const int16_t& g, const int16_t& b);
+  RGBColor(const HSLColor& hsl);
+  RGBColor(const uint32_t& v);
+
   const uint32_t val() const;
 };
 
-struct HSLPix {
-  int16_t h,s,l;
-  HSLPix(const RGBPix& rgb);
+class HSLColor {
+public:
+  int16_t h_,s_,l_;
+  HSLColor() : h_(0), s_(0), l_(0) {
+
+  }
+  HSLColor(const RGBColor& rgb);
   void adjustHue(const int16_t& amount);
   void adjustSaturation(const int16_t& amount);
   void adjustLightness(const int16_t& amount);

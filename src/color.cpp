@@ -19,22 +19,22 @@ RGB_Format parseFormat(const string& s) {
   }
 }
 
-RGBPix::RGBPix(const uint8_t& r, const uint8_t& g, const uint8_t& b) :
-  r(r),
-  g(g),
-  b(b) {
+RGBColor::RGBColor(const int16_t& r, const int16_t& g, const int16_t& b) :
+  r_(r),
+  g_(g),
+  b_(b) {
 }
 
-RGBPix::RGBPix(const HSLPix& hsl) :
-    r(0), g(0), b(0) {
-  float L = ((float) hsl.l) / 100;
-  float S = ((float) hsl.s) / 100;
-  float H = ((float) hsl.h) / 360;
+RGBColor::RGBColor(const HSLColor& hsl) :
+    r_(0), g_(0), b_(0) {
+  float L = ((float) hsl.l_) / 100;
+  float S = ((float) hsl.s_) / 100;
+  float H = ((float) hsl.h_) / 360;
 
-  if (hsl.s == 0) {
-    r = hsl.l;
-    g = hsl.l;
-    b = hsl.l;
+  if (hsl.s_ == 0) {
+    r_ = hsl.l_;
+    g_ = hsl.l_;
+    b_ = hsl.l_;
   } else {
     float temp1 = 0;
     if (L < .50) {
@@ -53,13 +53,13 @@ RGBPix::RGBPix(const HSLPix& hsl) :
         temp3 = H + .33333f;
         if (temp3 > 1)
           temp3 -= 1;
-        HSLtoRGB_Subfunction(r, temp1, temp2, temp3);
+        HSLtoRGB_Subfunction(r_, temp1, temp2, temp3);
         break;
       }
       case 1: // green
       {
         temp3 = H;
-        HSLtoRGB_Subfunction(g, temp1, temp2, temp3);
+        HSLtoRGB_Subfunction(g_, temp1, temp2, temp3);
         break;
       }
       case 2: // blue
@@ -67,25 +67,25 @@ RGBPix::RGBPix(const HSLPix& hsl) :
         temp3 = H - .33333f;
         if (temp3 < 0)
           temp3 += 1;
-        HSLtoRGB_Subfunction(b, temp1, temp2, temp3);
+        HSLtoRGB_Subfunction(b_, temp1, temp2, temp3);
         break;
       }
       }
     }
   }
-  r = (unsigned int) ((((float) r) / 100) * 255);
-  g = (unsigned int) ((((float) g) / 100) * 255);
-  b = (unsigned int) ((((float) b) / 100) * 255);
+  r_ = (unsigned int) ((((float) r_) / 100) * 255);
+  g_ = (unsigned int) ((((float) g_) / 100) * 255);
+  b_ = (unsigned int) ((((float) b_) / 100) * 255);
 }
 
-RGBPix::RGBPix(const uint32_t& v) :
-  r((uint8_t)((v>>16)&0xFF)),
-  g((uint8_t)((v>>8)&0xFF)),
-  b((uint8_t)(v&0xFF)){
+RGBColor::RGBColor(const uint32_t& v) :
+  r_((uint8_t)((v>>16)&0xFF)),
+  g_((uint8_t)((v>>8)&0xFF)),
+  b_((uint8_t)(v&0xFF)){
 }
 
 // This is a subfunction of HSLtoRGB
-void RGBPix::HSLtoRGB_Subfunction(uint8_t& c, const float& temp1, const float& temp2,
+void RGBColor::HSLtoRGB_Subfunction(int16_t& c, const float& temp1, const float& temp2,
     const float& temp3) {
   if ((temp3 * 6) < 1)
     c = (unsigned int) ((temp2 + (temp1 - temp2) * 6 * temp3) * 100);
@@ -99,15 +99,15 @@ void RGBPix::HSLtoRGB_Subfunction(uint8_t& c, const float& temp1, const float& t
   return;
 }
 
-const uint32_t RGBPix::val() const {
-  return ((uint32_t)r<<16) | ((uint32_t)g<<8) | b;
+const uint32_t RGBColor::val() const {
+  return ((uint32_t)r_<<16) | ((uint32_t)g_<<8) | b_;
 }
 
 
-HSLPix::HSLPix(const RGBPix& rgb) {
-  float r_percent = ((float) rgb.r) / 255;
-  float g_percent = ((float) rgb.g) / 255;
-  float b_percent = ((float) rgb.b) / 255;
+HSLColor::HSLColor(const RGBColor& rgb) {
+  float r_percent = ((float) rgb.r_) / 255;
+  float g_percent = ((float) rgb.g_) / 255;
+  float b_percent = ((float) rgb.b_) / 255;
 
   float max_color = 0;
   if ((r_percent >= g_percent) && (r_percent >= b_percent)) {
@@ -151,44 +151,44 @@ HSLPix::HSLPix(const RGBPix& rgb) {
       H = 4 + (r_percent - g_percent) / (max_color - min_color);
     }
   }
-  s = (unsigned int) (S * 100);
-  l = (unsigned int) (L * 100);
+  s_ = (unsigned int) (S * 100);
+  l_ = (unsigned int) (L * 100);
   H = H * 60;
   if (H < 0)
     H += 360;
-  h = (unsigned int) H;
+  h_ = (unsigned int) H;
 }
 
-void HSLPix::adjustHue(const int16_t& amount) {
-  h+=amount;
+void HSLColor::adjustHue(const int16_t& amount) {
+  h_+=amount;
 
-  if (h < 0) {
-    h = h % -360;
-  } else if ( h > 360 ) {
-    h = h % 360;
-  }
-}
-
-void HSLPix::adjustSaturation(const int16_t& amount) {
-  s+=amount;
-  if (s < 0) {
-    s = s * -1;
-  }
-
-  if ( s > 100 ) {
-    s = 100;
+  if (h_ < 0) {
+    h_ = h_ % -360;
+  } else if ( h_ > 360 ) {
+    h_ = h_ % 360;
   }
 }
 
-
-void HSLPix::adjustLightness(const int16_t& amount) {
-  l+=amount;
-
-  if (l < 0) {
-    l = l * -1;
+void HSLColor::adjustSaturation(const int16_t& amount) {
+  s_+=amount;
+  if (s_ < 0) {
+    s_ = s_ * -1;
   }
 
-  if ( l > 100 ) {
-    l = 100;
+  if ( s_ > 100 ) {
+    s_ = 100;
+  }
+}
+
+
+void HSLColor::adjustLightness(const int16_t& amount) {
+  l_+=amount;
+
+  if (l_ < 0) {
+    l_ = l_ * -1;
+  }
+
+  if ( l_ > 100 ) {
+    l_ = 100;
   }
 }

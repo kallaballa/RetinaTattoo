@@ -10,7 +10,9 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <boost/tokenizer.hpp>
+
 #include "fps.hpp"
+#include "heartbeat.hpp"
 
 namespace asio = boost::asio;
 using asio::ip::udp;
@@ -30,46 +32,6 @@ void printUsage() {
   cerr << "<host>\thostname to connect to" << endl;
   cerr << "<port>\tudp port of the target host" << endl;
 }
-
-class HeartbeatReceiver {
-  udp::socket* socket;
-  char buf[1];
-  boost::posix_time::ptime last;
-  bool alive_;
-  bool checked_;
-public:
-  HeartbeatReceiver(udp::socket* socket) :
-    socket(socket),
-    alive_(false),
-    checked_(false)
-  {}
-
-  void run() {
-    using namespace boost::posix_time;
-    boost::system::error_code error;
-    ptime now;
-    udp::endpoint endpoint;
-    while(!this->checked_ || this->alive_) {
-      socket->receive_from(asio::buffer(buf), endpoint, 0, error);
-
-      if(error == boost::system::errc::success) {
-        last = microsec_clock::local_time();
-      }
-    }
-  }
-
-  bool alive() {
-    ptime now = microsec_clock::local_time();
-    if((now - last).total_milliseconds() < 1000) {
-      this->alive_ = true;
-      this->checked_ = true;
-    } else {
-      this->alive_ = false;
-    }
-
-    return this->alive_;
-  }
-};
 
 int main(int argc, char** argv) {
   try {
@@ -203,7 +165,7 @@ int main(int argc, char** argv) {
         sleep( milliseconds(targetDur));
       }
 
-      cerr << endl << "client lost" << endl;
+      cerr << endl << "server lost" << endl;
     }
   }
   catch (std::exception& e) {
